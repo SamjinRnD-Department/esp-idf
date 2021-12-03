@@ -30,6 +30,14 @@
 #include "lwip/sockets.h"
 #include "esp_smartconfig.h"
 #include "smartconfig_ack.h"
+#include "nvs_flash.h"
+
+#if CONFIG_ESP32_SC_ACK_INCLUDE_DEVICE_ID
+#define SC_ACK_DEVICE_ID_PARTITION_NAME  CONFIG_ESP32_DEVICE_ID_PARTITION_NAME
+#define SC_ACK_DEVICE_ID_NAMESPACE       CONFIG_ESP32_DEVICE_ID_NAMESPACE
+#define SC_ACK_DEVICE_ID_KEY_NAME        CONFIG_ESP32_DEVICE_ID_KEY_NAME
+#define SC_ACK_DEVICE_ID_LENGTH          CONFIG_ESP32_DEVICE_ID_LENGTH
+#endif
 
 #define SC_ACK_TASK_PRIORITY             2          /*!< Priority of sending smartconfig ACK task */
 #define SC_ACK_TASK_STACK_SIZE           2048       /*!< Stack size of sending smartconfig ACK task */
@@ -41,7 +49,11 @@
 #define SC_ACK_AIRKISS_DEVICE_PORT       10001      /*!< Airkiss UDP port of server on device */
 #define SC_ACK_AIRKISS_TIMEOUT           1500       /*!< Airkiss read data timout millisecond */
 
-#define SC_ACK_TOUCH_LEN                 11         /*!< Length of ESPTouch ACK context */
+#if CONFIG_ESP32_SC_ACK_INCLUDE_DEVICE_ID
+#define SC_ACK_TOUCH_LEN                 11 + SC_ACK_DEVICE_ID_LENGTH         /*!< Length of ESP touch ACK context */
+#else
+#define SC_ACK_TOUCH_LEN                 11         /*!< Length of ESP touch ACK context */
+#endif
 #define SC_ACK_AIRKISS_LEN               7          /*!< Length of Airkiss ACK context */
 
 #define SC_ACK_MAX_COUNT                 30         /*!< Maximum count of sending smartconfig ACK */
@@ -55,6 +67,9 @@ typedef struct sc_ack {
         uint8_t token;            /*!< Smartconfig token from the cellphone */
         uint8_t mac[6];           /*!< MAC address of station */
         uint8_t ip[4];            /*!< IP address of cellphone */
+#if CONFIG_ESP32_SC_ACK_INCLUDE_DEVICE_ID
+        uint8_t id[SC_ACK_DEVICE_ID_LENGTH];           /*!< Device ID from factory NVS */
+#endif
     } ctx;
 } sc_ack_t;
 
@@ -191,6 +206,31 @@ _end:
     vTaskDelete(NULL);
 }
 
+#if CONFIG_ESP32_SC_ACK_INCLUDE_DEVICE_ID
+static esp_err_t sc_ack_get_str(const char *key, char **buf, size_t *length)
+{
+    nvs_handle_t handle;
+    size_t len = 0;
+    esp_err_t err = nvs_flash_init_partition(SC_ACK_DEVICE_ID_PARTITION_NAME);
+    if (err == ESP_OK) {
+        nvs_open_from_partition(SC_ACK_DEVICE_ID_PARTITION_NAME, SC_ACK_DEVICE_ID_NAMESPACE, NVS_READONLY, &handle);
+        err = nvs_get_str(handle, key, NULL, &len);
+        if (err == ESP_OK) {
+            *buf = malloc(len);
+            if (*buf == NULL) {
+                return ESP_ERR_NO_MEM;
+            }
+            if (length != NULL) {
+                *length = len;
+            }
+            err = nvs_get_str(handle, key, *buf, &len);
+        }
+        nvs_close(handle);
+    }
+    return err;
+}
+#endif
+
 esp_err_t sc_send_ack_start(smartconfig_type_t type, uint8_t token, uint8_t *cellphone_ip)
 {
     sc_ack_t *ack = NULL;
@@ -208,6 +248,15 @@ esp_err_t sc_send_ack_start(smartconfig_type_t type, uint8_t token, uint8_t *cel
     ack->type = type;
     ack->ctx.token = token;
     memcpy(ack->ctx.ip, cellphone_ip, 4);
+#if CONFIG_ESP32_SC_ACK_INCLUDE_DEVICE_ID
+    char *device_id = NULL;
+    esp_err_t err = sc_ack_get_str(SC_ACK_DEVICE_ID_KEY_NAME, &device_id, NULL);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Read device id fail");
+        return err;
+    }
+    memcpy(ack->ctx.id, device_id, SC_ACK_DEVICE_ID_LENGTH);
+#endif
 
     s_sc_ack_send = true;
 

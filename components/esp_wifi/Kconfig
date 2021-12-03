@@ -406,3 +406,32 @@ menu "PHY"
             2 KB(Bluetooth only) or 5.3 KB(Wi-Fi + Bluetooth).
 
 endmenu  # PHY
+
+menu "SmartConfig"
+
+    config ESP32_SC_ACK_INCLUDE_DEVICE_ID
+        bool "Include device ID in SmartConfig ACK"
+        default n
+
+    config ESP32_DEVICE_ID_PARTITION_NAME
+        string "Device ID partition name"
+        depends on ESP32_SC_ACK_INCLUDE_DEVICE_ID
+        default "factorynvs"
+
+    config ESP32_DEVICE_ID_NAMESPACE
+        string "Device ID namespace"
+        depends on ESP32_SC_ACK_INCLUDE_DEVICE_ID
+        default "factory"
+
+    config ESP32_DEVICE_ID_KEY_NAME
+        string "Device ID key name"
+        depends on ESP32_SC_ACK_INCLUDE_DEVICE_ID
+        default "device_id"
+
+    config ESP32_DEVICE_ID_LENGTH
+        int "Device ID length"
+        depends on ESP32_SC_ACK_INCLUDE_DEVICE_ID
+        default 14
+
+endmenu  # SmartConfig
+
