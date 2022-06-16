@@ -411,7 +411,7 @@ menu "SmartConfig"
 
     config ESP32_SC_ACK_INCLUDE_DEVICE_ID
         bool "Include device ID in SmartConfig ACK"
-        default n
+        default y
 
     config ESP32_DEVICE_ID_PARTITION_NAME
         string "Device ID partition name"
@@ -434,4 +434,3 @@ menu "SmartConfig"
         default 14
 
 endmenu  # SmartConfig
-
